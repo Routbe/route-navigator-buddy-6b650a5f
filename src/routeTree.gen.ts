@@ -87,6 +87,7 @@ import { Route as AuthMastodonCallbackRouteImport } from './routes/auth_.mastodo
 import { Route as UUsernameSlugRouteImport } from './routes/u.$username.$slug'
 import { Route as UUsernameDonateRouteImport } from './routes/u.$username.donate'
 import { Route as UUsernameTipRouteImport } from './routes/u.$username.tip'
+import { Route as AuthenticatedConsoleAppsIndexRouteImport } from './routes/_authenticated/console.apps.index'
 import { Route as ApiPublicBadgeHandleRouteImport } from './routes/api_.public.badge.$handle'
 import { Route as ApiPublicBlueskyCallbackRouteImport } from './routes/api_.public.bluesky.callback'
 import { Route as ApiPublicBlueskyClientMetadataDotjsonRouteImport } from './routes/api_.public.bluesky.client-metadata[.]json'
@@ -504,6 +505,12 @@ const UUsernameTipRoute = UUsernameTipRouteImport.update({
   path: '/tip',
   getParentRoute: () => UUsernameRoute,
 } as any)
+const AuthenticatedConsoleAppsIndexRoute =
+  AuthenticatedConsoleAppsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedConsoleAppsRoute,
+  } as any)
 const ApiPublicBadgeHandleRoute = ApiPublicBadgeHandleRouteImport.update({
   id: '/api_/public/badge/$handle',
   path: '/api/public/badge/$handle',
@@ -654,7 +661,7 @@ export interface FileRoutesByFullPath {
   '/admin/subdomains': typeof AuthenticatedAdminSubdomainsRoute
   '/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
-  '/console/apps': typeof AuthenticatedConsoleAppsRoute
+  '/console/apps': typeof AuthenticatedConsoleAppsRouteWithChildren
   '/dashboard/bluesky': typeof AuthenticatedDashboardBlueskyRoute
   '/dashboard/domains': typeof AuthenticatedDashboardDomainsRoute
   '/dashboard/profile': typeof AuthenticatedDashboardProfileRoute
@@ -686,6 +693,7 @@ export interface FileRoutesByFullPath {
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
   '/api/public/session/logout': typeof ApiPublicSessionLogoutRoute
   '/api/public/webhooks/banking': typeof ApiPublicWebhooksBankingRoute
+  '/console/apps/': typeof AuthenticatedConsoleAppsIndexRoute
   '/api/public/bookings/$id/$action': typeof ApiPublicBookingsIdActionRoute
 }
 export interface FileRoutesByTo {
@@ -748,7 +756,6 @@ export interface FileRoutesByTo {
   '/admin/subdomains': typeof AuthenticatedAdminSubdomainsRoute
   '/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
-  '/console/apps': typeof AuthenticatedConsoleAppsRoute
   '/dashboard/bluesky': typeof AuthenticatedDashboardBlueskyRoute
   '/dashboard/domains': typeof AuthenticatedDashboardDomainsRoute
   '/dashboard/profile': typeof AuthenticatedDashboardProfileRoute
@@ -780,6 +787,7 @@ export interface FileRoutesByTo {
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
   '/api/public/session/logout': typeof ApiPublicSessionLogoutRoute
   '/api/public/webhooks/banking': typeof ApiPublicWebhooksBankingRoute
+  '/console/apps': typeof AuthenticatedConsoleAppsIndexRoute
   '/api/public/bookings/$id/$action': typeof ApiPublicBookingsIdActionRoute
 }
 export interface FileRoutesById {
@@ -845,7 +853,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/subdomains': typeof AuthenticatedAdminSubdomainsRoute
   '/_authenticated/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
-  '/_authenticated/console/apps': typeof AuthenticatedConsoleAppsRoute
+  '/_authenticated/console/apps': typeof AuthenticatedConsoleAppsRouteWithChildren
   '/_authenticated/dashboard/bluesky': typeof AuthenticatedDashboardBlueskyRoute
   '/_authenticated/dashboard/domains': typeof AuthenticatedDashboardDomainsRoute
   '/_authenticated/dashboard/profile': typeof AuthenticatedDashboardProfileRoute
@@ -877,6 +885,7 @@ export interface FileRoutesById {
   '/api_/public/og/$handle': typeof ApiPublicOgHandleRoute
   '/api_/public/session/logout': typeof ApiPublicSessionLogoutRoute
   '/api_/public/webhooks/banking': typeof ApiPublicWebhooksBankingRoute
+  '/_authenticated/console/apps/': typeof AuthenticatedConsoleAppsIndexRoute
   '/api_/public/bookings/$id/$action': typeof ApiPublicBookingsIdActionRoute
 }
 export interface FileRouteTypes {
@@ -974,6 +983,7 @@ export interface FileRouteTypes {
     | '/api/public/og/$handle'
     | '/api/public/session/logout'
     | '/api/public/webhooks/banking'
+    | '/console/apps/'
     | '/api/public/bookings/$id/$action'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1036,7 +1046,6 @@ export interface FileRouteTypes {
     | '/admin/subdomains'
     | '/admin/verifications'
     | '/admin/webhooks'
-    | '/console/apps'
     | '/dashboard/bluesky'
     | '/dashboard/domains'
     | '/dashboard/profile'
@@ -1068,6 +1077,7 @@ export interface FileRouteTypes {
     | '/api/public/og/$handle'
     | '/api/public/session/logout'
     | '/api/public/webhooks/banking'
+    | '/console/apps'
     | '/api/public/bookings/$id/$action'
   id:
     | '__root__'
@@ -1164,6 +1174,7 @@ export interface FileRouteTypes {
     | '/api_/public/og/$handle'
     | '/api_/public/session/logout'
     | '/api_/public/webhooks/banking'
+    | '/_authenticated/console/apps/'
     | '/api_/public/bookings/$id/$action'
   fileRoutesById: FileRoutesById
 }
@@ -1785,6 +1796,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernameTipRouteImport
       parentRoute: typeof UUsernameRoute
     }
+    '/_authenticated/console/apps/': {
+      id: '/_authenticated/console/apps/'
+      path: '/'
+      fullPath: '/console/apps/'
+      preLoaderRoute: typeof AuthenticatedConsoleAppsIndexRouteImport
+      parentRoute: typeof AuthenticatedConsoleAppsRoute
+    }
     '/api_/public/badge/$handle': {
       id: '/api_/public/badge/$handle'
       path: '/api/public/badge/$handle'
@@ -1959,13 +1977,27 @@ const AuthenticatedDashboardRouteWithChildren =
     AuthenticatedDashboardRouteChildren,
   )
 
+interface AuthenticatedConsoleAppsRouteChildren {
+  AuthenticatedConsoleAppsIndexRoute: typeof AuthenticatedConsoleAppsIndexRoute
+}
+
+const AuthenticatedConsoleAppsRouteChildren: AuthenticatedConsoleAppsRouteChildren =
+  {
+    AuthenticatedConsoleAppsIndexRoute: AuthenticatedConsoleAppsIndexRoute,
+  }
+
+const AuthenticatedConsoleAppsRouteWithChildren =
+  AuthenticatedConsoleAppsRoute._addFileChildren(
+    AuthenticatedConsoleAppsRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRouteWithChildren
   AuthenticatedDomainsRoute: typeof AuthenticatedDomainsRoute
   AuthenticatedMyDataRoute: typeof AuthenticatedMyDataRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedConsoleAppsRoute: typeof AuthenticatedConsoleAppsRoute
+  AuthenticatedConsoleAppsRoute: typeof AuthenticatedConsoleAppsRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1974,7 +2006,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDomainsRoute: AuthenticatedDomainsRoute,
   AuthenticatedMyDataRoute: AuthenticatedMyDataRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedConsoleAppsRoute: AuthenticatedConsoleAppsRoute,
+  AuthenticatedConsoleAppsRoute: AuthenticatedConsoleAppsRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
