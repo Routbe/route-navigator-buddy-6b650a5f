@@ -31,3 +31,11 @@
 - [ ] WhatsApp/Green-API schrappen; Telegram + sms als verificatie.
 - [ ] Bestaande Telegram-fout oplossen; verificatiecontrole elke 2,5 s.
 - [ ] Pagina 'Account beveiligen' afmaken + Telegram-webhook koppelen (Telegram-bot nodig).
+
+## Login-knoppen & openbaar profiel (okt 2026)
+- [x] Alle inlogknoppen altijd zichtbaar, melding bij ontbrekende sleutel.
+- [x] Privacy & Openbaar Profiel: profiel aan/uit, tijdlijn aan/uit.
+- [x] Openbare tijdlijn (badges + mijlpalen) op /u/alias en /handle.
+- [x] Architectuurdocument identity broker (docs/identity-broker-architecture.md).
+- [ ] Migratie `db/43_public_activity.sql` op Neon uitvoeren (wacht op jou).
+- [ ] Sleutels in preview/Vercel zetten om providers live te testen (wacht op jou).
