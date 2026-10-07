@@ -37,5 +37,5 @@
 - [x] Privacy & Openbaar Profiel: profiel aan/uit, tijdlijn aan/uit.
 - [x] Openbare tijdlijn (badges + mijlpalen) op /u/alias en /handle.
 - [x] Architectuurdocument identity broker (docs/identity-broker-architecture.md).
-- [ ] Migratie `db/43_public_activity.sql` op Neon uitvoeren (wacht op jou).
-- [ ] Sleutels in preview/Vercel zetten om providers live te testen (wacht op jou).
+- [x] Migratie 43 uitgevoerd op Neon.
+- [ ] Dezelfde sleutels in Vercel zetten (+ NITRO_PRESET=vercel) en redeployen (wacht op jou).
