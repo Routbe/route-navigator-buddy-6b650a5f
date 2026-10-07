@@ -79,5 +79,8 @@ export const getPublicAliasProfileByHandle = createServerFn({ method: "GET" })
     const { readPublicAliasProfile } = await import("./alias-profile.server");
     const row = await readPublicAliasProfile(data.handle);
     if (!row) return null;
-    return row as Record<string, Json>;
+    const { parseDisplayPrefs } = await import("./profile-display");
+    const { redactPrivateProfile } = await import("./public-timeline");
+    const prefs = parseDisplayPrefs((row as Record<string, unknown>)["display_prefs"]);
+    return redactPrivateProfile(row as Record<string, unknown>, prefs) as Record<string, Json>;
   });

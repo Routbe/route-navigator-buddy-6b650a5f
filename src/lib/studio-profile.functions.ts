@@ -86,5 +86,8 @@ export const getPublicProfileByHandle = createServerFn({ method: "GET" })
     const { readPublicProfile } = await import("./studio-profile.server");
     const row = await readPublicProfile(data.handle);
     if (!row) return null;
-    return row as Record<string, Json>;
+    const { parseDisplayPrefs } = await import("./profile-display");
+    const { redactPrivateProfile } = await import("./public-timeline");
+    const prefs = parseDisplayPrefs((row as Record<string, unknown>)["display_prefs"]);
+    return redactPrivateProfile(row as Record<string, unknown>, prefs) as Record<string, Json>;
   });

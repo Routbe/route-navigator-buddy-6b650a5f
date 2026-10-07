@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { ProfileLookupError, ProfileMissing, ProfileView } from "@/components/profile/ProfileView";
 import { ProfileSuspended } from "@/components/profile/ProfileSuspended";
 import { ProfileFrozen } from "@/components/profile/ProfileFrozen";
+import { ProfilePrivate } from "@/components/profile/ProfilePrivate";
 import { useProfileRecord } from "@/hooks/useProfileRecord";
 import { canonicalHandle } from "@/lib/profile-url";
 import { looksLikeBase36Slug } from "@/lib/base36";
@@ -69,6 +70,11 @@ function HandleProfile({ username }: { username: string }) {
   // Self-paused (frozen) accounts stay private until the owner signs in again.
   if (profile.status === "frozen") {
     return <ProfileFrozen username={handle} />;
+  }
+
+  // Privé profiel: bezoekers zien geen inhoud of tijdlijn.
+  if (!parseDisplayPrefs(profile.display_prefs).publicProfile) {
+    return <ProfilePrivate username={handle} />;
   }
 
   // Shared identity, flexible URL: /handle, /@handle, /u/handle and /u/@handle

@@ -826,6 +826,38 @@ export function ProfileEditor({ variant = "verified" }: { variant?: ProfileVaria
                     </a>
                   </section>
 
+                {/* 🔒 Privacy & Openbaar Profiel */}
+                <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
+                  <h2 className="text-lg font-medium">🔒 Privacy &amp; Openbaar Profiel</h2>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Openbaar profiel</p>
+                      <p className="text-sm text-muted-foreground">
+                        Uit: bezoekers zien geen profielinhoud of tijdlijn. Jij kunt alles blijven beheren.
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Openbaar profiel"
+                      checked={prefs.publicProfile}
+                      onCheckedChange={(v) => setPref("publicProfile", v)}
+                    />
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Tijdlijn openbaar tonen</p>
+                      <p className="text-sm text-muted-foreground">
+                        Mijlpalen, badges en status, nieuwste eerst.
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label="Tijdlijn openbaar tonen"
+                      checked={prefs.timelineVisible}
+                      disabled={!prefs.publicProfile}
+                      onCheckedChange={(v) => setPref("timelineVisible", v)}
+                    />
+                  </div>
+                </section>
+
                 {/* 🏅 Badges: eigen map binnen Links & componenten, met schakelaar. */}
                 <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-4">

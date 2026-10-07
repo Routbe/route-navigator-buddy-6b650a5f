@@ -33,6 +33,7 @@ import { SocialPlatformIcon } from "@/lib/social-icons";
 import { PLATFORM_LABEL, formatFollowers } from "@/lib/social-verify";
 import { formatReach } from "@/lib/total-reach";
 import { FavoritesShowcase } from "@/components/profile/FavoritesShowcase";
+import { ProfileTimeline } from "@/components/profile/ProfileTimeline";
 import { BadgeShowcase } from "@/components/profile/BadgeShowcase";
 import { VerifiedInfoDialog } from "@/components/profile/VerifiedInfoDialog";
 import { monthYear } from "@/components/profile/VerifiedBadgePopover";
@@ -471,6 +472,8 @@ export function ProfileView({
         )}
 
         {prefs.badgeShowcaseVisible && <BadgeShowcase userId={profile.id} theme={t} />}
+
+        {prefs.timelineVisible && <ProfileTimeline userId={profile.id} theme={t} />}
 
         <FavoritesShowcase favorites={prefs.favorites} theme={t} layout={prefs.favoritesLayout} />
 

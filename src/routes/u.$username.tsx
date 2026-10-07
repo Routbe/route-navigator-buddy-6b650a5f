@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { ProfileLookupError, ProfileMissing, ProfileView } from "@/components/profile/ProfileView";
 import { ProfileSuspended } from "@/components/profile/ProfileSuspended";
 import { ProfileFrozen } from "@/components/profile/ProfileFrozen";
+import { ProfilePrivate } from "@/components/profile/ProfilePrivate";
 import { useProfileRecord } from "@/hooks/useProfileRecord";
 import { getPublicProfileByHandle } from "@/lib/studio-profile.functions";
 import { getRequestLocale } from "@/lib/locale.functions";
@@ -50,6 +51,11 @@ function FreeProfile() {
   // Self-paused (frozen) accounts stay private until the owner signs in again.
   if (profile.status === "frozen") {
     return <ProfileFrozen username={handle} />;
+  }
+
+  // Privé profiel: bezoekers zien geen inhoud of tijdlijn.
+  if (!parseDisplayPrefs(profile.display_prefs).publicProfile) {
+    return <ProfilePrivate username={handle} />;
   }
 
   return <ProfileView profile={profile} free />;
