@@ -28,6 +28,10 @@ export type OAuthClient = {
   status: string;
   hasSecret: boolean;
   createdAt: string;
+  /** `seamless` = direct doorgaan; `strict` = altijd een extra verificatiecode. */
+  flowPreference: "seamless" | "strict";
+  /** Mag de app (met toestemming van de gebruiker) publieke activiteit ontvangen? */
+  richIdentityEnabled: boolean;
 };
 
 export class OAuthError extends Error {
@@ -126,6 +130,22 @@ export async function ensureTables(): Promise<void> {
     created_at timestamptz not null default now(),
     retired_at timestamptz
   )`;
+  // Migratie 44 — uitsluitend voor "Login met ROUT" (geen invloed op rout.be-login).
+  await sql`alter table public.oauth_clients add column if not exists flow_preference text not null default 'seamless'`;
+  await sql`alter table public.oauth_clients add column if not exists rich_identity_enabled boolean not null default false`;
+  await sql`alter table public.oauth_auth_codes add column if not exists acr text`;
+  await sql`alter table public.oauth_auth_codes add column if not exists rich_identity boolean not null default false`;
+  await sql`create table if not exists public.oauth_step_up_codes (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null,
+    client_id text not null,
+    code_hash text not null,
+    attempts int not null default 0,
+    expires_at timestamptz not null,
+    verified_at timestamptz,
+    consumed_at timestamptz,
+    created_at timestamptz not null default now()
+  )`;
   tablesReady = true;
 }
 
@@ -145,6 +165,8 @@ function toClient(row: Row): OAuthClient {
     status: String(row["status"] ?? "active"),
     hasSecret: Boolean(row["secret_hash"]),
     createdAt: new Date(row["created_at"] as string).toISOString(),
+    flowPreference: row["flow_preference"] === "strict" ? "strict" : "seamless",
+    richIdentityEnabled: Boolean(row["rich_identity_enabled"]),
   };
 }
 
@@ -172,6 +194,8 @@ export type ClientInput = {
   termsUrl?: string | null;
   redirectUris: string[];
   scopes: string[];
+  flowPreference?: "seamless" | "strict";
+  richIdentityEnabled?: boolean;
 };
 
 function sanitize(input: ClientInput) {
@@ -200,7 +224,15 @@ export async function createClient(
             ${input.homepageUrl ?? null}, ${input.privacyUrl ?? null}, ${input.termsUrl ?? null},
             ${uris}, ${scopes})
     returning *`) as Row[];
-  return { client: toClient(rows[0]!), clientSecret };
+  const created = rows[0]!;
+  if (input.flowPreference || input.richIdentityEnabled !== undefined) {
+    const updated = (await sql`update public.oauth_clients set
+        flow_preference = ${input.flowPreference === "strict" ? "strict" : "seamless"},
+        rich_identity_enabled = ${Boolean(input.richIdentityEnabled)}
+      where id = ${created["id"] as string} returning *`) as Row[];
+    return { client: toClient(updated[0]!), clientSecret };
+  }
+  return { client: toClient(created), clientSecret };
 }
 
 export async function updateClient(
@@ -214,6 +246,8 @@ export async function updateClient(
       name = ${name}, logo_url = ${input.logoUrl ?? null},
       homepage_url = ${input.homepageUrl ?? null}, privacy_url = ${input.privacyUrl ?? null},
       terms_url = ${input.termsUrl ?? null}, redirect_uris = ${uris}, scopes = ${scopes},
+      flow_preference = coalesce(${input.flowPreference ?? null}, flow_preference),
+      rich_identity_enabled = coalesce(${input.richIdentityEnabled ?? null}::boolean, rich_identity_enabled),
       updated_at = now()
     where id = ${id} and owner_user_id = ${ownerUserId} returning *`) as Row[];
   if (!rows[0]) throw new OAuthError("not_found", "Deze app bestaat niet (meer).");
@@ -245,15 +279,18 @@ export async function issueAuthorizationCode(input: {
   scopes: string[];
   codeChallenge: string;
   nonce?: string | null;
+  acr?: string | null;
+  richIdentity?: boolean;
 }): Promise<string> {
   await ensureTables();
   const code = randomToken(32);
   const hash = await sha256Base64Url(code);
   const expires = new Date(Date.now() + CODE_TTL_MS).toISOString();
   await sql`insert into public.oauth_auth_codes
-    (code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, nonce, expires_at)
+    (code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, nonce, expires_at, acr, rich_identity)
     values (${hash}, ${input.clientId}, ${input.userId}, ${input.redirectUri},
-            ${input.scopes}, ${input.codeChallenge}, ${input.nonce ?? null}, ${expires})`;
+            ${input.scopes}, ${input.codeChallenge}, ${input.nonce ?? null}, ${expires},
+            ${input.acr ?? null}, ${Boolean(input.richIdentity)})`;
   return code;
 }
 
@@ -366,6 +403,19 @@ export async function exchangeAuthorizationCode(input: {
   const userId = String(row["user_id"]);
   const scopes = (row["scopes"] as string[] | null) ?? [];
   const claims = await identityClaims(userId, scopes);
+  // Rich Identity: enkel als de app het aanzette én de gebruiker het aanvinkte.
+  if (row["rich_identity"] && client.richIdentityEnabled) {
+    try {
+      const { readPublicTimeline } = await import("@/lib/public-timeline.server");
+      claims["rout_public_activity"] = (await readPublicTimeline(userId)).map((i) => ({
+        kind: i.kind,
+        title: i.title,
+        occurred_at: i.occurred_at,
+      }));
+    } catch {
+      claims["rout_public_activity"] = [];
+    }
+  }
   const now = Math.floor(Date.now() / 1000);
   const idToken = await signJwt({
     iss: issuer(),
@@ -374,6 +424,7 @@ export async function exchangeAuthorizationCode(input: {
     iat: now,
     exp: now + ID_TOKEN_TTL_S,
     ...(row["nonce"] ? { nonce: String(row["nonce"]) } : {}),
+    ...(row["acr"] ? { acr: String(row["acr"]) } : {}),
     ...claims,
   });
   const accessToken = await signJwt({
@@ -490,4 +541,54 @@ export async function hasConsent(
   const granted = (rows[0]?.["scopes"] as string[] | null) ?? null;
   if (!granted) return false;
   return scopes.every((s) => granted.includes(s));
+}
+
+/* -------------------------------------------------------------- step-up */
+
+export async function createStepUpCode(userId: string, clientId: string): Promise<string> {
+  await ensureTables();
+  const digits = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000;
+  const code = String(digits).padStart(6, "0");
+  const hash = await sha256Base64Url(`${userId}:${clientId}:${code}`);
+  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  await sql`update public.oauth_step_up_codes set consumed_at = now()
+    where user_id = ${userId} and client_id = ${clientId} and consumed_at is null`;
+  await sql`insert into public.oauth_step_up_codes (user_id, client_id, code_hash, expires_at)
+    values (${userId}, ${clientId}, ${hash}, ${expires})`;
+  return code;
+}
+
+/** Controleert de code (max. 5 pogingen, 10 min geldig) en markeert hem als geverifieerd. */
+export async function verifyStepUpCode(userId: string, clientId: string, code: string) {
+  await ensureTables();
+  const rows = (await sql`select id, code_hash, attempts, expires_at from public.oauth_step_up_codes
+    where user_id = ${userId} and client_id = ${clientId} and consumed_at is null and verified_at is null
+    order by created_at desc limit 1`) as Row[];
+  const row = rows[0];
+  const { stepUpCodeState } = await import("./step-up");
+  const hash = await sha256Base64Url(`${userId}:${clientId}:${code.trim()}`);
+  const state = stepUpCodeState(
+    row ? { attempts: Number(row["attempts"]), expiresAt: String(row["expires_at"]), matches: hash === row["code_hash"] } : null,
+    Date.now(),
+  );
+  if (!row) return state;
+  if (state === "ok") {
+    await sql`update public.oauth_step_up_codes set verified_at = now() where id = ${row["id"] as string}`;
+  } else if (state === "wrong") {
+    await sql`update public.oauth_step_up_codes set attempts = attempts + 1 where id = ${row["id"] as string}`;
+  }
+  return state;
+}
+
+/** Verbruikt een recent geverifieerde code (eenmalig, binnen 10 minuten). */
+export async function consumeVerifiedStepUp(userId: string, clientId: string): Promise<boolean> {
+  await ensureTables();
+  const rows = (await sql`update public.oauth_step_up_codes set consumed_at = now()
+    where id = (select id from public.oauth_step_up_codes
+                 where user_id = ${userId} and client_id = ${clientId}
+                   and verified_at is not null and consumed_at is null
+                   and verified_at > now() - interval '10 minutes'
+                 order by verified_at desc limit 1)
+    returning id`) as Row[];
+  return rows.length > 0;
 }
