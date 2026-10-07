@@ -143,9 +143,11 @@ export default function AuthNeon({ initialMode = "magic" }: { initialMode?: Mode
   }, []);
 
   const KEYED = new Set(["google", "github", "gitlab", "apple", "oidc", "infomaniak"]);
-  const visibleTiles = TILES.filter(
-    (tile) => !KEYED.has(tile.provider) || (enabled ?? []).includes(tile.provider),
-  );
+  // Het volledige raster blijft altijd zichtbaar; een provider zonder sleutels
+  // stuurt geen aanvraag maar toont een duidelijke melding (zie `oauth`).
+  const visibleTiles = TILES;
+  const isInactive = (provider: string) =>
+    KEYED.has(provider) && enabled !== null && !enabled.includes(provider);
 
   useEffect(() => {
     if (!user || redirected.current) return;
@@ -183,6 +185,10 @@ export default function AuthNeon({ initialMode = "magic" }: { initialMode?: Mode
 
   /** OAuth via Neon Auth — de service stuurt door naar de provider. */
   const oauth = async (provider: string) => {
+    if (isInactive(provider)) {
+      toast.info("Deze inlogoptie is nog niet actief.");
+      return;
+    }
     setLoading(true);
     try {
       if (GENERIC_OAUTH.has(provider)) {

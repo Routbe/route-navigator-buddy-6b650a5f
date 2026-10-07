@@ -132,6 +132,10 @@ export interface ProfileDisplayPrefs {
   humanBadgeVisible: boolean;
   /** Badgeverzameling onder de profielkop tonen. */
   badgeShowcaseVisible: boolean;
+  /** Openbaar profiel aan/uit. Uit = bezoekers zien geen inhoud. */
+  publicProfile: boolean;
+  /** Openbare tijdlijn (mijlpalen, badges, status) tonen. */
+  timelineVisible: boolean;
   badgeType: BadgeType;
   badgeNameFormat: BadgeNameFormat;
   /** Achtergrondje achter de badge (gloed, sticker of randje). */
@@ -213,6 +217,8 @@ export const DEFAULT_DISPLAY_PREFS: ProfileDisplayPrefs = {
   badgeVisible: true,
   humanBadgeVisible: true,
   badgeShowcaseVisible: true,
+  publicProfile: true,
+  timelineVisible: true,
   badgeType: "verified",
   badgeNameFormat: "full",
   badgeBackdrop: "none",
@@ -394,6 +400,8 @@ export function parseDisplayPrefs(raw: unknown): ProfileDisplayPrefs {
     humanBadgeVisible: r["humanBadgeVisible"] === undefined ? true : Boolean(r["humanBadgeVisible"]),
     badgeShowcaseVisible:
       r["badgeShowcaseVisible"] === undefined ? true : Boolean(r["badgeShowcaseVisible"]),
+    publicProfile: r["publicProfile"] === undefined ? true : Boolean(r["publicProfile"]),
+    timelineVisible: r["timelineVisible"] === undefined ? true : Boolean(r["timelineVisible"]),
     badgeType: oneOf(r["badgeType"], ["verified", "human", "domain", "none"] as const, "verified"),
     badgeNameFormat: oneOf(r["badgeNameFormat"], ["full", "initials", "lower"] as const, "full"),
     badgeBackdrop: oneOf(r["badgeBackdrop"], ["none", "glow", "sticker", "ring"] as const, "none"),
