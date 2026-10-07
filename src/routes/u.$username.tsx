@@ -1,4 +1,3 @@
-import { parseDisplayPrefs } from "@/lib/profile-display";
 import { useEffect } from "react";
 import { createFileRoute, useParams } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
