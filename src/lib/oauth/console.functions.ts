@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/middleware";
+import { needsStepUp, shareRichIdentity, STRICT_ACR } from "./step-up";
 
 /**
  * Server-functies voor de ROUT Developer Console en het toestemmingsscherm.
@@ -20,7 +21,9 @@ const clientSchema = z.object({
   privacyUrl: urlish,
   termsUrl: urlish,
   redirectUris: z.array(z.string().trim().max(300)).max(20),
-  scopes: z.array(z.enum(["openid", "profile", "email"])).max(3),
+  scopes: z.array(z.enum(["openid", "profile", "email", "linked_accounts"])).max(4),
+  flowPreference: z.enum(["seamless", "strict"]).optional(),
+  richIdentityEnabled: z.boolean().optional(),
 });
 
 async function assertVerified(userId: string) {
@@ -59,6 +62,8 @@ export const saveOAuthClient = createServerFn({ method: "POST" })
       termsUrl: data.termsUrl ?? null,
       redirectUris: data.redirectUris,
       scopes: data.scopes,
+      ...(data.flowPreference ? { flowPreference: data.flowPreference } : {}),
+      ...(data.richIdentityEnabled !== undefined ? { richIdentityEnabled: data.richIdentityEnabled } : {}),
     };
     if (data.id) {
       return { client: await updateClient(context.userId, data.id, input), clientSecret: null };
@@ -95,6 +100,9 @@ const authorizeSchema = z.object({
   nonce: z.string().max(300).nullable().optional(),
   codeChallenge: z.string().min(20).max(200),
   codeChallengeMethod: z.string().max(10),
+  prompt: z.string().max(60).nullable().optional(),
+  maxAge: z.string().max(12).nullable().optional(),
+  acrValues: z.string().max(200).nullable().optional(),
 });
 
 export type AuthorizePrompt = {
@@ -108,9 +116,27 @@ export type AuthorizePrompt = {
     termsUrl: string | null;
   };
   scopes?: string[];
-  account?: { email: string; name: string | null };
+  account?: { email: string; name: string | null; handle: string | null; avatarUrl: string | null };
   alreadyGranted?: boolean;
+  /** Strict flow / prompt=login / max_age / acr_values → extra code vereist. */
+  requiresStepUp?: boolean;
+  /** App vraagt (optioneel) publieke activiteit. */
+  richIdentity?: boolean;
 };
+
+async function profileOf(userId: string) {
+  const { sql } = await import("@/lib/neon");
+  try {
+    const rows = (await sql`select username, avatar_url from public.profiles
+      where user_id = ${userId} or id = ${userId} limit 1`) as Record<string, unknown>[];
+    return {
+      handle: (rows[0]?.["username"] as string | null) ?? null,
+      avatarUrl: (rows[0]?.["avatar_url"] as string | null) ?? null,
+    };
+  } catch {
+    return { handle: null, avatarUrl: null };
+  }
+}
 
 export const describeAuthorizeRequest = createServerFn({ method: "POST" })
   .middleware([requireAuth])
@@ -150,15 +176,23 @@ export const describeAuthorizeRequest = createServerFn({ method: "POST" })
       account: {
         email: context.user.email,
         name: (context.user.userMetadata["full_name"] as string | null) ?? null,
+        ...(await profileOf(context.userId)),
       },
       alreadyGranted: await hasConsent(context.userId, client.clientId, scopes),
+      requiresStepUp: needsStepUp({
+        flowPreference: client.flowPreference,
+        prompt: data.prompt ?? null,
+        maxAge: data.maxAge ?? null,
+        acrValues: data.acrValues ?? null,
+      }),
+      richIdentity: client.richIdentityEnabled,
     };
   });
 
 export const decideAuthorizeRequest = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((data: unknown) =>
-    authorizeSchema.extend({ allow: z.boolean() }).parse(data),
+    authorizeSchema.extend({ allow: z.boolean(), richIdentityOptIn: z.boolean().optional() }).parse(data),
   )
   .handler(async ({ data, context }): Promise<{ redirectTo: string } | { error: string }> => {
     const { getClientByClientId, redirectAllowed, issueAuthorizationCode, rememberConsent } =
@@ -184,7 +218,22 @@ export const decideAuthorizeRequest = createServerFn({ method: "POST" })
       .filter((s) => s && client.scopes.includes(s));
     if (!scopes.includes("openid")) scopes.unshift("openid");
 
+    const stepUp = needsStepUp({
+      flowPreference: client.flowPreference,
+      prompt: data.prompt ?? null,
+      maxAge: data.maxAge ?? null,
+      acrValues: data.acrValues ?? null,
+    });
+    if (stepUp) {
+      const { consumeVerifiedStepUp } = await import("./provider.server");
+      if (!(await consumeVerifiedStepUp(context.userId, client.clientId))) {
+        return { error: "Bevestig eerst de verificatiecode." };
+      }
+    }
+
     const code = await issueAuthorizationCode({
+      acr: stepUp ? STRICT_ACR : null,
+      richIdentity: shareRichIdentity(client.richIdentityEnabled, Boolean(data.richIdentityOptIn)),
       clientId: client.clientId,
       userId: context.userId,
       redirectUri: data.redirectUri,
@@ -195,4 +244,47 @@ export const decideAuthorizeRequest = createServerFn({ method: "POST" })
     await rememberConsent(context.userId, client.clientId, scopes);
     target.searchParams.set("code", code);
     return { redirectTo: target.toString() };
+  });
+
+/* ------------------------------------------------------------ step-up ---- */
+
+export const sendStepUpCode = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((data: unknown) => z.object({ clientId: z.string().min(4).max(120) }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { getClientByClientId, createStepUpCode } = await import("./provider.server");
+    const client = await getClientByClientId(data.clientId);
+    if (!client || client.status !== "active") return { ok: false, error: "Deze app is onbekend bij ROUT." };
+    const code = await createStepUpCode(context.userId, client.clientId);
+    const { sendTransactionalEmail } = await import("@/lib/notifications.server");
+    const safeName = client.name.replace(/[<>&"]/g, "");
+    const sent = await sendTransactionalEmail({
+      to: context.user.email,
+      subject: `Je ROUT-code: ${code}`,
+      html: `<p>Je verificatiecode om door te gaan naar <strong>${safeName}</strong>:</p>
+             <p style="font-size:28px;letter-spacing:6px;font-family:monospace"><strong>${code}</strong></p>
+             <p>Deze code is 10 minuten geldig. Vroeg je dit niet aan? Negeer dan deze e-mail.</p>`,
+      tags: ["oauth-step-up"],
+    });
+    const [user, domain] = context.user.email.split("@");
+    const masked = `${(user ?? "").slice(0, 2)}•••@${domain ?? ""}`;
+    return sent ? { ok: true, sentTo: masked } : { ok: false, error: "De code kon niet verstuurd worden." };
+  });
+
+export const verifyStepUp = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ clientId: z.string().min(4).max(120), code: z.string().regex(/^\d{6}$/) }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { verifyStepUpCode } = await import("./provider.server");
+    const state = await verifyStepUpCode(context.userId, data.clientId, data.code);
+    const messages: Record<string, string> = {
+      ok: "",
+      wrong: "Die code klopt niet.",
+      expired: "Deze code is verlopen. Vraag een nieuwe aan.",
+      locked: "Te veel pogingen. Vraag een nieuwe code aan.",
+      missing: "Vraag eerst een code aan.",
+    };
+    return { ok: state === "ok", error: messages[state] ?? "" };
   });
