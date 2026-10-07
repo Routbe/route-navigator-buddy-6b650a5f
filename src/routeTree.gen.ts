@@ -70,6 +70,7 @@ import { Route as AuthenticatedAdminSepaRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminSubdomainsRouteImport } from './routes/_authenticated/admin.subdomains'
 import { Route as AuthenticatedAdminVerificationsRouteImport } from './routes/_authenticated/admin.verifications'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
+import { Route as AuthenticatedConsoleAppsRouteImport } from './routes/_authenticated/console.apps'
 import { Route as AuthenticatedDashboardBlueskyRouteImport } from './routes/_authenticated/dashboard.bluesky'
 import { Route as AuthenticatedDashboardDomainsRouteImport } from './routes/_authenticated/dashboard.domains'
 import { Route as AuthenticatedDashboardProfileRouteImport } from './routes/_authenticated/dashboard.profile'
@@ -413,6 +414,12 @@ const AuthenticatedAdminWebhooksRoute =
     path: '/webhooks',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedConsoleAppsRoute =
+  AuthenticatedConsoleAppsRouteImport.update({
+    id: '/console/apps',
+    path: '/console/apps',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardBlueskyRoute =
   AuthenticatedDashboardBlueskyRouteImport.update({
     id: '/bluesky',
@@ -647,6 +654,7 @@ export interface FileRoutesByFullPath {
   '/admin/subdomains': typeof AuthenticatedAdminSubdomainsRoute
   '/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/console/apps': typeof AuthenticatedConsoleAppsRoute
   '/dashboard/bluesky': typeof AuthenticatedDashboardBlueskyRoute
   '/dashboard/domains': typeof AuthenticatedDashboardDomainsRoute
   '/dashboard/profile': typeof AuthenticatedDashboardProfileRoute
@@ -740,6 +748,7 @@ export interface FileRoutesByTo {
   '/admin/subdomains': typeof AuthenticatedAdminSubdomainsRoute
   '/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/console/apps': typeof AuthenticatedConsoleAppsRoute
   '/dashboard/bluesky': typeof AuthenticatedDashboardBlueskyRoute
   '/dashboard/domains': typeof AuthenticatedDashboardDomainsRoute
   '/dashboard/profile': typeof AuthenticatedDashboardProfileRoute
@@ -836,6 +845,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/subdomains': typeof AuthenticatedAdminSubdomainsRoute
   '/_authenticated/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/_authenticated/console/apps': typeof AuthenticatedConsoleAppsRoute
   '/_authenticated/dashboard/bluesky': typeof AuthenticatedDashboardBlueskyRoute
   '/_authenticated/dashboard/domains': typeof AuthenticatedDashboardDomainsRoute
   '/_authenticated/dashboard/profile': typeof AuthenticatedDashboardProfileRoute
@@ -932,6 +942,7 @@ export interface FileRouteTypes {
     | '/admin/subdomains'
     | '/admin/verifications'
     | '/admin/webhooks'
+    | '/console/apps'
     | '/dashboard/bluesky'
     | '/dashboard/domains'
     | '/dashboard/profile'
@@ -1025,6 +1036,7 @@ export interface FileRouteTypes {
     | '/admin/subdomains'
     | '/admin/verifications'
     | '/admin/webhooks'
+    | '/console/apps'
     | '/dashboard/bluesky'
     | '/dashboard/domains'
     | '/dashboard/profile'
@@ -1120,6 +1132,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/subdomains'
     | '/_authenticated/admin/verifications'
     | '/_authenticated/admin/webhooks'
+    | '/_authenticated/console/apps'
     | '/_authenticated/dashboard/bluesky'
     | '/_authenticated/dashboard/domains'
     | '/_authenticated/dashboard/profile'
@@ -1653,6 +1666,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminWebhooksRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/console/apps': {
+      id: '/_authenticated/console/apps'
+      path: '/console/apps'
+      fullPath: '/console/apps'
+      preLoaderRoute: typeof AuthenticatedConsoleAppsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard/bluesky': {
       id: '/_authenticated/dashboard/bluesky'
       path: '/bluesky'
@@ -1945,6 +1965,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDomainsRoute: typeof AuthenticatedDomainsRoute
   AuthenticatedMyDataRoute: typeof AuthenticatedMyDataRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedConsoleAppsRoute: typeof AuthenticatedConsoleAppsRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1953,6 +1974,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDomainsRoute: AuthenticatedDomainsRoute,
   AuthenticatedMyDataRoute: AuthenticatedMyDataRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedConsoleAppsRoute: AuthenticatedConsoleAppsRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
